@@ -16,7 +16,8 @@ def generate_blog_content(query: str) -> str:
     """
     # Define the prompt that will be sent to the model
     prompt = f"""
-    <s>[INST]Human: Write a comprehensive blog post on {query}. 
+    <s>[INST]Human: Write a comprehensive blog post on {query} in markdown format. 
+    Use markdown syntax, such as # for headers, * for bullet points, and other appropriate markdown elements.
     Provide an in-depth analysis of the latest advancements and their technological impacts. 
     The style should mirror detailed articles found in respected tech publications like Wired or TechCrunch, focusing on clarity and expert insight. 
     The narrative should be from the perspective of a technology expert, using professional yet understandable language. 
@@ -105,7 +106,7 @@ def lambda_handler(event, context):
     if blog_content:
         # Generate a unique key for the S3 object using the current timestamp
         current_time = datetime.datetime.now().strftime("%H%M%S")
-        s3_key = f"blog_output/{current_time}.txt"  # S3 object key (path)
+        s3_key = f"blog_output/{current_time}.md"  # S3 object key (path)
         s3_bucket = "blog-gen-app"  # Your S3 bucket name
 
         # Save the generated blog content to S3
