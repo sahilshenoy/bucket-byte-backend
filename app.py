@@ -36,10 +36,10 @@ def generate_blog_content(query: str) -> str:
 
     try:
         # Initialize the Amazon Bedrock client
-        bedrock = boto3.client(
-            "bedrock_runtime",
+        bedrock=boto3.client(
+            "bedrock-runtime",
             region_name="us-east-1",
-            config=botocore.config.Config(read_timeout=300, retries={"max_attempts": 3})
+            config=botocore.config.Config(read_timeout=300,retries={'max_attempts':3})
         )
         
         # Invoke the model to generate the blog content
