@@ -28,7 +28,7 @@ def generate_blog_content(query: str) -> str:
     # Define the request body with the model parameters
     body = {
         "prompt": prompt,
-        "max_gen_len": 512,
+        "max_gen_len": 1024,
         "temperature": 0.5,  # Controls creativity; higher value increases randomness
         "top_p": 0.9,  # Controls diversity; higher value allows more diverse words
     }
