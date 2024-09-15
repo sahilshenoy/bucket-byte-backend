@@ -43,7 +43,7 @@ def generate_blog_content(query: str) -> str:
         # Initialize the Amazon Bedrock client
         bedrock = boto3.client(
             "bedrock-runtime",
-            region_name=os.environ.get('AWS_REGION', 'us-east-1'),  # AWS Region from environment
+            region_name=os.environ.get('REGION', 'us-east-1'),  # AWS Region from environment
             config=botocore.config.Config(read_timeout=300, retries={'max_attempts': 3})  # Retry and timeout configuration
         )
         
