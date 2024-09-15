@@ -2,6 +2,7 @@ import boto3
 import botocore.config
 import json
 import datetime
+import uuid
 
 # Function to generate a blog using the Amazon Bedrock foundation model
 def generate_blog_content(query: str) -> str:
@@ -123,23 +124,22 @@ def lambda_handler(event, context):
                 'body': json.dumps('Error generating the blog content.')
             }
 
-        # Generate a unique key for the S3 object using the current timestamp
-        current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        s3_key = f"blog_output/{current_time}.md"
+        # Generate a unique ID for the blog post
+        blog_id = str(uuid.uuid4())
+
+        # Generate a unique key for the S3 object using the blog_id
+        s3_key = f"blogs/{blog_id}.md"
         s3_bucket = "blog-gen-app"  # Ensure this bucket exists and Lambda has permissions
 
         # Save the generated blog content to S3
         save_blog_to_s3(s3_key, s3_bucket, blog_content)
 
-        # Generate a pre-signed URL for the S3 object
-        presigned_url = generate_presigned_url(s3_bucket, s3_key, expiration=3600)
-
-        # Return success with the pre-signed URL
+        # Return success with the blog ID
         return {
             'statusCode': 200,
             'body': json.dumps({
                 'message': 'Blog generation and saving are completed!',
-                'presignedUrl': presigned_url
+                'blogId': blog_id
             })
         }
     except Exception as e:
