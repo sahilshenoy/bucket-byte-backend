@@ -22,7 +22,7 @@ def generate_blog_content(query: str) -> str:
     
     Provide an in-depth analysis covering all relevant aspects of the topic, including practical examples, statistics, and real-world applications where appropriate. The style should mirror detailed articles found in respected tech publications like *Wired* or *TechCrunch*, focusing on clarity, depth, and expert insight.
     
-    The narrative should be from the perspective of a technology expert, using professional yet accessible language. Organize the blog with clear and logical subheadings that suit the content, ensuring a smooth flow of ideas. Begin with an engaging introduction to set the context and conclude with a thoughtful summary or call to action.
+    The narrative should be from the perspective of a technology expert, using professional yet accessible language. Organize the blog with clear and logical subheadings that suit the content, ensuring a smooth flow of ideas. Begin with an engaging introduction to set the context and conclude with a thoughtful summary or call to action. Donot include an image.
     
     The tone should be informative, authoritative, and engaging, designed to keep tech enthusiasts informed and captivated throughout the article. Ensure the content is original, free of plagiarism, and optimized for readability.
     
