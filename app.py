@@ -1,14 +1,20 @@
-import boto3
-import botocore.config
-import json
-import datetime
-import uuid
+import boto3  # AWS SDK for Python
+import botocore.config  # For configuring AWS client with retries, timeouts, etc.
+import json  # For handling JSON data (requests and responses)
+import uuid  # To generate unique identifiers for S3 object keys
+import os  # To access environment variables (for bucket name, region, etc.)
 
-# Function to generate a blog using the Amazon Bedrock foundation model
 def generate_blog_content(query: str) -> str:
     """
-    Generates a comprehensive blog post based on the input query using a foundation model from Amazon Bedrock.
+    Generates a comprehensive blog post based on the input query using the Amazon Bedrock model.
+
+    Args:
+        query (str): The blog topic input by the user.
+    
+    Returns:
+        str: The generated blog content in markdown format.
     """
+    # Define the prompt to be sent to the model, using markdown syntax.
     prompt = f"""
     <s>[INST]Human: Write a comprehensive blog post on "{query}" in markdown format. Use appropriate markdown syntax, including:
 
@@ -20,131 +26,126 @@ def generate_blog_content(query: str) -> str:
     - Hyperlinks ([text](URL)) where relevant
     - Image placeholders (![alt text](image-url-placeholder)) if applicable
     
-    Provide an in-depth analysis covering all relevant aspects of the topic, including practical examples, statistics, and real-world applications where appropriate. The style should mirror detailed articles found in respected tech publications like *Wired* or *TechCrunch*, focusing on clarity, depth, and expert insight.
-    
-    The narrative should be from the perspective of a technology expert, using professional yet accessible language. Organize the blog with clear and logical subheadings that suit the content, ensuring a smooth flow of ideas. Begin with an engaging introduction to set the context and conclude with a thoughtful summary or call to action. Donot include an image.
-    
-    The tone should be informative, authoritative, and engaging, designed to keep tech enthusiasts informed and captivated throughout the article. Ensure the content is original, free of plagiarism, and optimized for readability.
-    
+    Provide an in-depth analysis covering all relevant aspects of the topic, including practical examples, statistics, and real-world applications where appropriate.
+    The narrative should be expert yet accessible, engaging for tech enthusiasts. 
     Assistant:[/INST]</s>
     """
 
+    # Model parameters for the AI text generation
     body = {
         "prompt": prompt,
-        "max_gen_len": 1024,
-        "temperature": 0.5,
-        "top_p": 0.9,
+        "max_gen_len": 1024,  # Max characters to generate
+        "temperature": 0.5,  # Creativity level (higher is more creative)
+        "top_p": 0.9  # Sampling parameter for diverse output
     }
 
     try:
         # Initialize the Amazon Bedrock client
         bedrock = boto3.client(
             "bedrock-runtime",
-            region_name="us-east-1",  # Ensure you're in a supported region for Bedrock
-            config=botocore.config.Config(read_timeout=300, retries={'max_attempts': 3})
+            region_name=os.environ.get('AWS_REGION', 'us-east-1'),  # AWS Region from environment
+            config=botocore.config.Config(read_timeout=300, retries={'max_attempts': 3})  # Retry and timeout configuration
         )
         
-        # Invoke the model to generate the blog content
+        # Send the request to Bedrock to generate the content
         response = bedrock.invoke_model(
             body=json.dumps(body),
-            modelId="meta.llama3-70b-instruct-v1:0"
+            modelId="meta.llama3-70b-instruct-v1:0"  # Model ID for the Llama 3 model
         )
         
-        # Parse the response
+        # Extract the generated content from the response
         response_content = response['body'].read()
         response_data = json.loads(response_content)
-        blog_content = response_data.get('generation', "")
-        
+        blog_content = response_data.get('generation', "")  # Get the generated markdown content
+
         return blog_content
     except Exception as e:
         print(f"Error generating the blog: {e}")
-        return ""
+        raise  # Re-raise the exception for error handling in lambda_handler
 
-# Function to save the generated blog to an S3 bucket
 def save_blog_to_s3(s3_key: str, s3_bucket: str, blog_content: str):
     """
     Saves the generated blog content to an S3 bucket.
+
+    Args:
+        s3_key (str): The key (filename) to store the blog in S3.
+        s3_bucket (str): The name of the S3 bucket.
+        blog_content (str): The blog content in markdown format.
     """
-    s3 = boto3.client('s3')
+    s3 = boto3.client('s3')  # Initialize S3 client
 
     try:
-        # Attempt to upload the blog content to the S3 bucket
-        s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=blog_content)
+        # Upload the blog content to S3
+        s3.put_object(Bucket=s3_bucket, Key=s3_key, Body=blog_content, ContentType='text/markdown')
         print(f"Blog saved to S3 at {s3_key}.")
-
-        # Verify if the object exists in the S3 bucket
-        head_response = s3.head_object(Bucket=s3_bucket, Key=s3_key)
-        print(f"HeadObject response: {head_response}")  # This should print metadata of the object if it exists
-
     except Exception as e:
-        print(f"Error saving the blog to S3: {e}")  # Log any issues with the S3 put_object
+        print(f"Error saving the blog to S3: {e}")
+        raise  # Re-raise exception for error handling in lambda_handler
 
-def generate_presigned_url(s3_bucket: str, s3_key: str, expiration: int = 3600) -> str:
-    """
-    Generate a pre-signed URL for the S3 object.
-    """
-    s3 = boto3.client('s3')
-
-    try:
-        presigned_url = s3.generate_presigned_url(
-            'get_object',  # Ensure this is 'get_object'
-            Params={'Bucket': s3_bucket, 'Key': s3_key},
-            ExpiresIn=expiration
-        )
-        print(f"Generated pre-signed URL: {presigned_url}")
-        return presigned_url
-    except Exception as e:
-        print(f"Error generating pre-signed URL: {e}")
-        return ""
-
-
-
-# Lambda function handler to process events and generate/save blogs
 def lambda_handler(event, context):
     """
-    AWS Lambda handler to generate a blog based on the input topic and save it to S3.
+    AWS Lambda handler to process incoming API requests, generate a blog, and save it to S3.
+
+    Args:
+        event (dict): The event data passed to the Lambda function (API Gateway request).
+        context (dict): The runtime context of the Lambda function.
+
+    Returns:
+        dict: HTTP response with a success or error message.
     """
     try:
-        # Parse the incoming event
-        event_body = json.loads(event.get('body', '{}'))
-        blog_topic = event_body.get('blogTopic', "")
+        print(f"Received event: {event}")  # Log the incoming event for debugging
+        event_body = json.loads(event.get('body', '{}'))  # Parse the JSON request body
+        blog_topic = event_body.get('blogTopic', "")  # Extract the 'blogTopic' from the request
 
+        # If no blog topic is provided, return a 400 error
         if not blog_topic:
             return {
                 'statusCode': 400,
-                'body': json.dumps('Blog topic is required.')
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                },
+                'body': json.dumps({'error': 'Blog topic is required.'})
             }
 
-        # Generate the blog content
+        # Generate blog content using the Bedrock model
         blog_content = generate_blog_content(query=blog_topic)
 
         if not blog_content:
-            return {
-                'statusCode': 500,
-                'body': json.dumps('Error generating the blog content.')
-            }
+            raise Exception("Failed to generate blog content")  # Raise an error if blog content is empty
 
-        # Generate a unique ID for the blog post
+        # Create a unique ID for the blog file
         blog_id = str(uuid.uuid4())
+        s3_key = f"blogs/{blog_id}.md"  # Key (filename) for the blog in S3
+        s3_bucket = os.environ.get('S3_BUCKET_NAME', 'blog-gen-app')  # S3 bucket name from environment
 
-        # Generate a unique key for the S3 object using the blog_id
-        s3_key = f"blogs/{blog_id}.md"
-        s3_bucket = "blog-gen-app"  # Ensure this bucket exists and Lambda has permissions
-
-        # Save the generated blog content to S3
+        # Save the blog content to S3
         save_blog_to_s3(s3_key, s3_bucket, blog_content)
 
-        # Return success with the blog ID
+        # Respond with success and the blog ID
         return {
             'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+            },
             'body': json.dumps({
                 'message': 'Blog generation and saving are completed!',
-                'blogId': blog_id
+                'blogId': blog_id  # Return the blog ID for future use
             })
         }
     except Exception as e:
+        # Handle any errors during the process
         print(f"Error processing the request: {e}")
         return {
             'statusCode': 500,
-            'body': json.dumps('Internal server error.')
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+            },
+            'body': json.dumps({'error': str(e)})
         }
